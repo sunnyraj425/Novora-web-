@@ -244,6 +244,21 @@ function NovoraStoreApp() {
   // CUSTOMER AUTHENTICATION VIEWS (/login, /signup)
   // -------------------------------------------------------------
   if (currentView.page === 'login' || currentView.page === 'signup') {
+    // If auth state is still determining, wait to avoid flashing login on refresh
+    if (authLoading) {
+      return (
+        <div className="min-h-screen bg-[#040404] flex items-center justify-center text-white">
+          <div className="text-center space-y-4">
+            <NovoraLogo variant="vertical" size="sm" />
+            <div className="w-6 h-6 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin mx-auto mt-2" />
+            <div className="text-[11px] font-mono uppercase tracking-widest text-[#D4AF37]">
+              Checking Customer Session...
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     // If user is already authenticated:
     // If admin, send to /admin; if customer, send to /account
     if (user) {

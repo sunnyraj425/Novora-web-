@@ -536,30 +536,44 @@ export async function saveHomepageConfigToFirestore(cfg: HomepageConfigRecord): 
 export async function syncCustomerAfterAuth(
   uid: string,
   email: string,
-  displayName?: string | null
+  displayName?: string | null,
+  providerId?: string
 ): Promise<{
   id: string;
+  uid: string;
+  userId: string;
   email: string;
   name: string;
   phone?: string;
+  provider: string;
+  role: string;
   purchasedProducts: any[];
   totalSpent: number;
   orderCount: number;
   createdAt: string;
+  updatedAt: string;
+  lastLoginAt: string;
 }> {
   const customerId = email.toLowerCase().replace(/[^a-z0-9]/g, '_');
   const userRef = doc(db, 'users', uid);
   const custRef = doc(db, 'customers', customerId);
+  const now = new Date().toISOString();
 
   let profileData = {
     id: uid,
+    uid: uid,
     userId: uid,
     email: email.toLowerCase(),
     name: displayName || email.split('@')[0] || 'Executive Member',
+    phone: '',
+    provider: providerId || 'password',
+    role: 'customer',
     purchasedProducts: [] as any[],
     totalSpent: 0,
     orderCount: 0,
-    createdAt: new Date().toISOString()
+    createdAt: now,
+    updatedAt: now,
+    lastLoginAt: now
   };
 
   try {
@@ -570,7 +584,16 @@ export async function syncCustomerAfterAuth(
 
     if (userSnap.exists()) {
       const uData = userSnap.data();
-      profileData = { ...profileData, ...uData };
+      profileData = { 
+        ...profileData, 
+        ...uData,
+        id: uid,
+        uid: uid,
+        userId: uid,
+        // Prefer explicit incoming values if freshly provided
+        name: displayName || uData.name || profileData.name,
+        provider: providerId || uData.provider || profileData.provider
+      };
     }
 
     if (custSnap.exists()) {
@@ -579,23 +602,31 @@ export async function syncCustomerAfterAuth(
       profileData.totalSpent = cData.totalSpent || profileData.totalSpent;
       profileData.orderCount = cData.orderCount || profileData.orderCount;
       if (cData.name && !userSnap.exists()) profileData.name = cData.name;
-      if (cData.phone) (profileData as any).phone = cData.phone;
+      if (cData.phone) profileData.phone = cData.phone;
     }
 
-    // Persist/Update user profile in Firestore
+    const createdAtVal = (userSnap.exists() && userSnap.data()?.createdAt) ? userSnap.data().createdAt : now;
+    const roleVal = (userSnap.exists() && userSnap.data()?.role) ? userSnap.data().role : profileData.role;
+
+    // Persist/Update user profile in Firestore (No passwords stored)
     await setDoc(userRef, {
+      uid: uid,
       id: uid,
       email: email.toLowerCase(),
       name: profileData.name,
-      phone: (profileData as any).phone || '',
-      role: 'customer',
-      lastLoginAt: new Date().toISOString()
+      phone: profileData.phone || '',
+      provider: profileData.provider,
+      role: roleVal,
+      createdAt: createdAtVal,
+      updatedAt: now,
+      lastLoginAt: now
     }, { merge: true });
 
-    // Link customer record if exists
+    // Link customer record if exists or ensure presence
     if (custSnap.exists()) {
       await updateDoc(custRef, {
-        userId: uid
+        userId: uid,
+        lastOrderDate: custSnap.data()?.lastOrderDate || now
       });
     }
   } catch (err) {
@@ -605,26 +636,41 @@ export async function syncCustomerAfterAuth(
   return profileData;
 }
 
-export async function fetchCustomerOrders(email: string): Promise<OrderRecord[]> {
+export async function fetchCustomerOrders(email: string, uid?: string): Promise<OrderRecord[]> {
   try {
     const colRef = collection(db, 'orders');
-    const q = query(colRef, where('customerEmail', '==', email.toLowerCase()));
-    const snap = await getDocs(q);
-    const orders: OrderRecord[] = [];
-    snap.forEach((d) => {
-      orders.push({ ...d.data(), id: d.id } as OrderRecord);
+    const ordersMap = new Map<string, OrderRecord>();
+
+    // 1. Query by customer email (lowercase)
+    const q1 = query(colRef, where('customerEmail', '==', email.toLowerCase()));
+    const snap1 = await getDocs(q1);
+    snap1.forEach((d) => {
+      ordersMap.set(d.id, { ...d.data(), id: d.id } as OrderRecord);
     });
 
+    // 2. Query by original email case if different
     if (email !== email.toLowerCase()) {
       const q2 = query(colRef, where('customerEmail', '==', email));
       const snap2 = await getDocs(q2);
       snap2.forEach((d) => {
-        if (!orders.some((o) => o.id === d.id)) {
-          orders.push({ ...d.data(), id: d.id } as OrderRecord);
-        }
+        ordersMap.set(d.id, { ...d.data(), id: d.id } as OrderRecord);
       });
     }
 
+    // 3. Query by userId if provided
+    if (uid) {
+      try {
+        const q3 = query(colRef, where('userId', '==', uid));
+        const snap3 = await getDocs(q3);
+        snap3.forEach((d) => {
+          ordersMap.set(d.id, { ...d.data(), id: d.id } as OrderRecord);
+        });
+      } catch (uidErr) {
+        // Query might require index or userId might be optional
+      }
+    }
+
+    const orders = Array.from(ordersMap.values());
     orders.sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
     return orders;
   } catch (err) {

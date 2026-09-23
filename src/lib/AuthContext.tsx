@@ -5,6 +5,7 @@ import {
   signInWithPopup, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
+  sendPasswordResetEmail,
   signOut as firebaseSignOut,
   updateProfile as firebaseUpdateProfile
 } from 'firebase/auth';
@@ -15,6 +16,36 @@ import {
   updateCustomerProfileData 
 } from './firestoreService';
 import { CustomerProfile } from '../types';
+
+export function formatAuthError(err: any, email?: string): string {
+  if (!err) return 'Authentication failed. Please verify your credentials.';
+  const code = err.code || '';
+
+  switch (code) {
+    case 'auth/invalid-credential':
+      return 'Invalid credentials. Please verify your email and password. If you originally registered with Google, use "Continue with Google" or click "Forgot Password?" below to set an email password.';
+    case 'auth/user-not-found':
+      return 'No customer account found with this email address. Please check your email or click "Create Account".';
+    case 'auth/wrong-password':
+      return 'Incorrect password. Please try again or click "Forgot Password?" to reset it.';
+    case 'auth/invalid-email':
+      return 'Please enter a valid email address.';
+    case 'auth/too-many-requests':
+      return 'Access to this account has been temporarily disabled due to multiple failed login attempts. Please try again later or reset your password.';
+    case 'auth/network-request-failed':
+      return 'Network connection issue. Please check your internet connection and try again.';
+    case 'auth/email-already-in-use':
+      return 'An account with this email already exists. If you previously registered using Google, please use "Continue with Google" or click "Forgot Password?" on the Sign In tab to set a password.';
+    case 'auth/weak-password':
+      return 'Password is too weak. Please use at least 6 characters.';
+    case 'auth/popup-closed-by-user':
+      return 'Google sign-in popup was closed before completing authentication.';
+    case 'auth/popup-blocked':
+      return 'The Google sign-in popup was blocked by your browser. Please allow popups for this site.';
+    default:
+      return err.message || 'Authentication error encountered. Please try again.';
+  }
+}
 
 interface AuthContextType {
   user: User | null;
@@ -28,6 +59,7 @@ interface AuthContextType {
   signInCustomerWithEmail: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
   signUpCustomerWithEmail: (email: string, pass: string, name?: string) => Promise<{ success: boolean; error?: string }>;
   signInCustomerWithGoogle: () => Promise<{ success: boolean; error?: string }>;
+  sendCustomerPasswordReset: (email: string) => Promise<{ success: boolean; message: string }>;
   // Admin Auth
   signInAdminWithEmail: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
   signInAdminWithGoogle: () => Promise<{ success: boolean; error?: string }>;
@@ -51,12 +83,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  const fetchAndSyncProfile = async (currentUser: User) => {
+  const fetchAndSyncProfile = async (currentUser: User, explicitProvider?: string) => {
     try {
+      const detectedProvider = explicitProvider || currentUser.providerData?.[0]?.providerId || 'password';
       const profile = await syncCustomerAfterAuth(
         currentUser.uid,
         currentUser.email || '',
-        currentUser.displayName
+        currentUser.displayName,
+        detectedProvider
       );
       setCustomerProfile(profile as CustomerProfile);
     } catch (err) {
@@ -104,17 +138,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const result = await signInWithEmailAndPassword(auth, email.trim(), pass);
       const adminStatus = await checkIsAdmin(result.user.uid, result.user.email);
       setIsAdmin(adminStatus);
-      await fetchAndSyncProfile(result.user);
+      await fetchAndSyncProfile(result.user, 'password');
       return { success: true };
     } catch (err: any) {
-      let msg = 'Invalid credentials. Please verify your email and password.';
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-        msg = 'No customer account found with these credentials. Please check your email or sign up.';
-      } else if (err.code === 'auth/wrong-password') {
-        msg = 'Incorrect password. Please try again.';
-      } else if (err.code === 'auth/too-many-requests') {
-        msg = 'Too many attempts. Account temporarily locked for security. Please try again later.';
-      }
+      const msg = formatAuthError(err, email);
       setAuthError(msg);
       return { success: false, error: msg };
     }
@@ -140,17 +167,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const profile = await syncCustomerAfterAuth(
         result.user.uid,
         result.user.email || '',
-        name || result.user.displayName
+        name?.trim() || result.user.displayName,
+        'password'
       );
       setCustomerProfile(profile as CustomerProfile);
       return { success: true };
     } catch (err: any) {
-      let msg = 'Account registration failed. Please try again.';
-      if (err.code === 'auth/email-already-in-use') {
-        msg = 'An account with this email already exists. Please log in instead.';
-      } else if (err.code === 'auth/weak-password') {
-        msg = 'Password is too weak. Please use at least 6 characters with letters and numbers.';
-      }
+      const msg = formatAuthError(err, email);
       setAuthError(msg);
       return { success: false, error: msg };
     }
@@ -162,12 +185,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const result = await signInWithPopup(auth, googleProvider);
       const adminStatus = await checkIsAdmin(result.user.uid, result.user.email);
       setIsAdmin(adminStatus);
-      await fetchAndSyncProfile(result.user);
+      await fetchAndSyncProfile(result.user, 'google.com');
       return { success: true };
     } catch (err: any) {
-      const msg = err.message || 'Google authentication was cancelled or failed.';
+      const msg = formatAuthError(err);
       setAuthError(msg);
       return { success: false, error: msg };
+    }
+  };
+
+  const sendCustomerPasswordReset = async (email: string): Promise<{ success: boolean; message: string }> => {
+    setAuthError(null);
+    const cleanEmail = email.trim();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      const errorMsg = 'Please enter a valid email address.';
+      return { success: false, message: errorMsg };
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, cleanEmail);
+      return {
+        success: true,
+        message: 'Password reset email sent. Please check your inbox.'
+      };
+    } catch (err: any) {
+      let msg = 'Unable to send password reset email. Please try again later.';
+      if (err.code === 'auth/invalid-email') {
+        msg = 'Please enter a valid email address.';
+      } else if (err.code === 'auth/user-not-found') {
+        msg = 'No customer account found with this email address.';
+      } else if (err.code === 'auth/too-many-requests') {
+        msg = 'Too many requests. Please wait a few minutes before trying again.';
+      } else if (err.code === 'auth/network-request-failed') {
+        msg = 'Network connection issue. Please check your internet connection.';
+      }
+      return { success: false, message: msg };
     }
   };
 
@@ -266,6 +318,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signInCustomerWithEmail,
         signUpCustomerWithEmail,
         signInCustomerWithGoogle,
+        sendCustomerPasswordReset,
         signInAdminWithEmail,
         signInAdminWithGoogle,
         signInWithGoogle,
@@ -291,3 +344,4 @@ export const useAuth = () => {
   }
   return context;
 };
+

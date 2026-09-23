@@ -61,13 +61,18 @@ export interface PurchasedEbook {
 
 export interface CustomerProfile {
   id: string;
+  uid?: string;
   userId?: string;
   email: string;
   name: string;
   phone?: string;
+  provider?: string;
+  role?: string;
   purchasedProducts: PurchasedEbook[];
   totalSpent: number;
   orderCount: number;
   createdAt: string;
+  updatedAt?: string;
+  lastLoginAt?: string;
   lastOrderDate?: string;
 }

@@ -68,7 +68,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
   useEffect(() => {
     if (user?.email) {
       setLoadingOrders(true);
-      fetchCustomerOrders(user.email)
+      fetchCustomerOrders(user.email, user.uid)
         .then((fetchedOrders) => {
           setOrders(fetchedOrders);
         })

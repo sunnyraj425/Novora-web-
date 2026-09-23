@@ -140,15 +140,18 @@
       "description": "Authenticated customer user profile.",
       "type": "object",
       "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
         "id": { "type": "string", "maxLength": 128 },
         "email": { "type": "string", "maxLength": 200 },
         "name": { "type": "string", "maxLength": 200 },
         "phone": { "type": "string", "maxLength": 50 },
+        "provider": { "type": "string", "maxLength": 50 },
         "role": { "type": "string", "enum": ["customer", "admin"] },
         "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
         "lastLoginAt": { "type": "string" }
       },
-      "required": ["id", "email"]
+      "required": ["uid", "email"]
     }
   },
   "firestore": {
