@@ -20,6 +20,7 @@ import { INITIAL_PRODUCTS } from '../data/products';
 export interface OrderRecord {
   id: string;
   orderRef?: string;
+  userId?: string;
   customerEmail: string;
   customerName: string;
   customerPhone?: string;
@@ -527,4 +528,124 @@ export async function saveHomepageConfigToFirestore(cfg: HomepageConfigRecord): 
     ...cfg,
     updatedAt: new Date().toISOString()
   }, { merge: true });
+}
+
+// -------------------------------------------------------------
+// CUSTOMER AUTH & DASHBOARD SERVICES
+// -------------------------------------------------------------
+export async function syncCustomerAfterAuth(
+  uid: string,
+  email: string,
+  displayName?: string | null
+): Promise<{
+  id: string;
+  email: string;
+  name: string;
+  phone?: string;
+  purchasedProducts: any[];
+  totalSpent: number;
+  orderCount: number;
+  createdAt: string;
+}> {
+  const customerId = email.toLowerCase().replace(/[^a-z0-9]/g, '_');
+  const userRef = doc(db, 'users', uid);
+  const custRef = doc(db, 'customers', customerId);
+
+  let profileData = {
+    id: uid,
+    userId: uid,
+    email: email.toLowerCase(),
+    name: displayName || email.split('@')[0] || 'Executive Member',
+    purchasedProducts: [] as any[],
+    totalSpent: 0,
+    orderCount: 0,
+    createdAt: new Date().toISOString()
+  };
+
+  try {
+    const [userSnap, custSnap] = await Promise.all([
+      getDoc(userRef),
+      getDoc(custRef)
+    ]);
+
+    if (userSnap.exists()) {
+      const uData = userSnap.data();
+      profileData = { ...profileData, ...uData };
+    }
+
+    if (custSnap.exists()) {
+      const cData = custSnap.data() as CustomerRecord;
+      profileData.purchasedProducts = cData.purchasedProducts || profileData.purchasedProducts;
+      profileData.totalSpent = cData.totalSpent || profileData.totalSpent;
+      profileData.orderCount = cData.orderCount || profileData.orderCount;
+      if (cData.name && !userSnap.exists()) profileData.name = cData.name;
+      if (cData.phone) (profileData as any).phone = cData.phone;
+    }
+
+    // Persist/Update user profile in Firestore
+    await setDoc(userRef, {
+      id: uid,
+      email: email.toLowerCase(),
+      name: profileData.name,
+      phone: (profileData as any).phone || '',
+      role: 'customer',
+      lastLoginAt: new Date().toISOString()
+    }, { merge: true });
+
+    // Link customer record if exists
+    if (custSnap.exists()) {
+      await updateDoc(custRef, {
+        userId: uid
+      });
+    }
+  } catch (err) {
+    console.warn('Customer profile sync note:', err);
+  }
+
+  return profileData;
+}
+
+export async function fetchCustomerOrders(email: string): Promise<OrderRecord[]> {
+  try {
+    const colRef = collection(db, 'orders');
+    const q = query(colRef, where('customerEmail', '==', email.toLowerCase()));
+    const snap = await getDocs(q);
+    const orders: OrderRecord[] = [];
+    snap.forEach((d) => {
+      orders.push({ ...d.data(), id: d.id } as OrderRecord);
+    });
+
+    if (email !== email.toLowerCase()) {
+      const q2 = query(colRef, where('customerEmail', '==', email));
+      const snap2 = await getDocs(q2);
+      snap2.forEach((d) => {
+        if (!orders.some((o) => o.id === d.id)) {
+          orders.push({ ...d.data(), id: d.id } as OrderRecord);
+        }
+      });
+    }
+
+    orders.sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
+    return orders;
+  } catch (err) {
+    console.error('Error fetching customer orders:', err);
+    return [];
+  }
+}
+
+export async function updateCustomerProfileData(
+  uid: string,
+  email: string,
+  updates: { name?: string; phone?: string }
+): Promise<void> {
+  const userRef = doc(db, 'users', uid);
+  await setDoc(userRef, updates, { merge: true });
+
+  const customerId = email.toLowerCase().replace(/[^a-z0-9]/g, '_');
+  try {
+    const custRef = doc(db, 'customers', customerId);
+    await setDoc(custRef, updates, { merge: true });
+  } catch (e) {
+    console.warn('Customer record sync note:', e);
+  }
 }

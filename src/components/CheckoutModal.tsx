@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { NovoraLogo } from './NovoraLogo';
 import { recordOrderInFirestore } from '../lib/firestoreService';
+import { useAuth } from '../lib/AuthContext';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -27,6 +28,7 @@ interface CheckoutModalProps {
   currency: Currency;
   appliedDiscount: number;
   onCompleteOrder: () => void;
+  onNavigateToLibrary?: () => void;
 }
 
 type PaymentTab = 'upi' | 'cards' | 'netbanking';
@@ -38,10 +40,25 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   currency,
   appliedDiscount,
   onCompleteOrder,
+  onNavigateToLibrary,
 }) => {
+  const { user, customerProfile, refreshCustomerProfile } = useAuth();
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+
+  // Auto-fill logged-in customer info if fields are empty
+  React.useEffect(() => {
+    if (user && !email) {
+      setEmail(user.email || '');
+    }
+    if ((customerProfile?.name || user?.displayName) && !name) {
+      setName(customerProfile?.name || user?.displayName || '');
+    }
+    if (customerProfile?.phone && !phone) {
+      setPhone(customerProfile.phone);
+    }
+  }, [user, customerProfile]);
   const [paymentTab, setPaymentTab] = useState<PaymentTab>('upi');
   const [upiId, setUpiId] = useState('');
   const [showQr, setShowQr] = useState(false);
@@ -81,8 +98,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
     recordOrderInFirestore({
       orderRef,
-      customerEmail: email.trim() || 'concierge-order@novora.digital',
-      customerName: name.trim() || 'Verified Executive',
+      userId: user?.uid,
+      customerEmail: email.trim() || user?.email || 'concierge-order@novora.digital',
+      customerName: name.trim() || customerProfile?.name || user?.displayName || 'Verified Executive',
       customerPhone: phone.trim() || undefined,
       productIds: cartItems.map((i) => i.product.id),
       productTitles: cartItems.map((i) => i.product.title),
@@ -92,6 +110,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       paymentMethod: paymentTab.toUpperCase(),
       licenseKey,
       orderDate: new Date().toISOString()
+    }).then(() => {
+      refreshCustomerProfile();
     }).catch((err) => {
       console.warn('Order sync note:', err);
     });
@@ -577,12 +597,25 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               )}
             </div>
 
-            <button
-              onClick={onClose}
-              className="w-full py-3 rounded border border-[#D4AF37]/30 text-white text-xs uppercase tracking-wider hover:bg-white/5 transition-all cursor-pointer"
-            >
-              Return to Catalog
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              {onNavigateToLibrary && (
+                <button
+                  onClick={() => {
+                    onClose();
+                    onNavigateToLibrary();
+                  }}
+                  className="flex-1 py-3 rounded-lg bg-gradient-to-r from-[#D4AF37] to-[#C9A227] hover:brightness-110 text-black text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-md"
+                >
+                  View in My Library →
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="flex-1 py-3 rounded-lg border border-[#D4AF37]/30 text-white text-xs uppercase tracking-wider hover:bg-white/5 transition-all cursor-pointer"
+              >
+                Return to Store
+              </button>
+            </div>
 
           </div>
         )}

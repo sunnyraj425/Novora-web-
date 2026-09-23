@@ -33,17 +33,39 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Customer Users: User profile documents stored under /users/{userId}
+    match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAdmin();
+    }
+
     // Orders: Checkout creates order, Admin reads all, customer reads own
     match /orders/{orderId} {
-      allow read: if isAdmin() || (isSignedIn() && resource.data.customerEmail == request.auth.token.email);
+      allow read: if isAdmin() || (isSignedIn() && (
+        resource.data.customerEmail == request.auth.token.email ||
+        (request.auth.token.email != null && resource.data.customerEmail.lower() == request.auth.token.email.lower()) ||
+        resource.data.userId == request.auth.uid
+      ));
       allow create: if request.resource.data.amount is number && request.resource.data.customerEmail is string;
       allow update, delete: if isAdmin();
     }
 
     // Customers: Admin manages customer list, customer reads own record
     match /customers/{customerId} {
-      allow read: if isAdmin() || (isSignedIn() && resource.data.email == request.auth.token.email);
-      allow write: if isAdmin() || (isSignedIn() && request.resource.data.email == request.auth.token.email);
+      allow read: if isAdmin() || (isSignedIn() && (
+        resource.data.email == request.auth.token.email ||
+        (request.auth.token.email != null && resource.data.email.lower() == request.auth.token.email.lower()) ||
+        resource.data.userId == request.auth.uid ||
+        customerId == request.auth.uid
+      ));
+      allow write: if isAdmin() || (isSignedIn() && (
+        request.resource.data.email == request.auth.token.email ||
+        (request.auth.token.email != null && request.resource.data.email.lower() == request.auth.token.email.lower()) ||
+        request.resource.data.userId == request.auth.uid ||
+        customerId == request.auth.uid
+      ));
     }
 
     // Categories: Public reads categories, Admin updates

@@ -6,9 +6,14 @@ import { Lock, Mail, Key, ShieldCheck, ArrowRight, AlertCircle, ArrowLeft, Check
 interface AdminLoginProps {
   onLoginSuccess: () => void;
   onBackToStore: () => void;
+  onNavigateToCustomerLogin?: () => void;
 }
 
-export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBackToStore }) => {
+export const AdminLogin: React.FC<AdminLoginProps> = ({ 
+  onLoginSuccess, 
+  onBackToStore,
+  onNavigateToCustomerLogin 
+}) => {
   const { 
     signInWithGoogle, 
     signInWithEmail, 
@@ -212,7 +217,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBackTo
         </form>
 
         {/* Mode Toggle */}
-        <div className="mt-6 pt-4 border-t border-white/5 text-center">
+        <div className="mt-6 pt-4 border-t border-white/5 text-center space-y-2">
           {mode === 'signin' ? (
             <button
               onClick={() => setMode('signup')}
@@ -227,6 +232,17 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBackTo
             >
               Already configured? <span className="underline text-white">Sign In</span>
             </button>
+          )}
+
+          {onNavigateToCustomerLogin && (
+            <div className="pt-2 border-t border-white/5">
+              <button
+                onClick={onNavigateToCustomerLogin}
+                className="text-[11px] text-[#D4AF37] hover:text-[#F5D76E] transition-colors font-medium"
+              >
+                Customer looking for your account? Sign in to Customer Panel →
+              </button>
+            </div>
           )}
         </div>
 

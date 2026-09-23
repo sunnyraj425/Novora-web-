@@ -76,6 +76,7 @@ interface AdminDashboardProps {
   onBackToStore: () => void;
   onNavigateToCategory?: (cat: PrimaryCategory) => void;
   initialEditProduct?: Product | null;
+  initialSection?: AdminSection;
   onProductUpdated?: (product: Product, allProducts: Product[]) => void;
 }
 
@@ -83,13 +84,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onBackToStore,
   onNavigateToCategory,
   initialEditProduct = null,
+  initialSection,
   onProductUpdated,
 }) => {
   const { user, isAdmin, signOut, ownerEmail } = useAuth();
 
   // Active section
   const [activeSection, setActiveSection] = useState<AdminSection>(
-    initialEditProduct ? 'products' : 'dashboard'
+    initialSection || (initialEditProduct ? 'products' : 'dashboard')
   );
 
   // Firestore Data State

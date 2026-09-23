@@ -1,13 +1,16 @@
 import React from 'react';
 import { NovoraLogo } from './NovoraLogo';
-import { PrimaryCategory } from '../types';
-import { Smartphone, Laptop, Tablet, Settings } from 'lucide-react';
+import { PrimaryCategory, CustomerAccountTab } from '../types';
+import { useAuth } from '../lib/AuthContext';
+import { Smartphone, Laptop, Tablet, ShieldCheck, User, BookOpen } from 'lucide-react';
 
 interface FooterProps {
   onNavigateCategory: (cat: PrimaryCategory) => void;
   onNavigateAllProducts: () => void;
   onNavigateAdmin: () => void;
   onNavigateHome: () => void;
+  onNavigateLogin?: () => void;
+  onNavigateAccount?: (tab?: CustomerAccountTab) => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({
@@ -15,7 +18,11 @@ export const Footer: React.FC<FooterProps> = ({
   onNavigateAllProducts,
   onNavigateAdmin,
   onNavigateHome,
+  onNavigateLogin,
+  onNavigateAccount,
 }) => {
+  const { user, isAdmin } = useAuth();
+
   return (
     <footer className="bg-[#050505] text-[#A8A8A8] border-t border-[#D4AF37]/20 pt-16 pb-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -39,7 +46,7 @@ export const Footer: React.FC<FooterProps> = ({
             </div>
           </div>
 
-          {/* Links Column 1: Curated Disciplines (EXACTLY 3) */}
+          {/* Links Column 1: Curated Disciplines */}
           <div className="lg:col-span-3 space-y-3 text-xs">
             <span className="text-[11px] font-semibold tracking-[0.2em] text-white uppercase block">
               Primary Disciplines
@@ -80,33 +87,66 @@ export const Footer: React.FC<FooterProps> = ({
             </ul>
           </div>
 
-          {/* Links Column 2: Administration & Standards */}
+          {/* Links Column 2: Customer Account & Support */}
           <div className="lg:col-span-2 space-y-3 text-xs">
             <span className="text-[11px] font-semibold tracking-[0.2em] text-white uppercase block">
-              Management
+              Customer Portal
             </span>
             <ul className="space-y-2 font-light">
-              <li>
-                <button
-                  onClick={onNavigateAdmin}
-                  className="hover:text-[#F5D76E] transition-colors cursor-pointer text-left flex items-center gap-1.5"
-                >
-                  <Settings className="w-3.5 h-3.5 text-[#D4AF37]" />
-                  <span>Admin Dashboard</span>
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={onNavigateHome}
-                  className="hover:text-[#F5D76E] transition-colors cursor-pointer text-left"
-                >
-                  Explore NOVORA
-                </button>
-              </li>
+              {user ? (
+                <>
+                  <li>
+                    <button
+                      onClick={() => onNavigateAccount?.('library')}
+                      className="hover:text-[#F5D76E] transition-colors cursor-pointer text-left flex items-center gap-1.5"
+                    >
+                      <BookOpen className="w-3.5 h-3.5 text-[#D4AF37]" />
+                      <span>My Digital Library</span>
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      onClick={() => onNavigateAccount?.('orders')}
+                      className="hover:text-[#F5D76E] transition-colors cursor-pointer text-left"
+                    >
+                      Order History
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      onClick={() => onNavigateAccount?.('settings')}
+                      className="hover:text-[#F5D76E] transition-colors cursor-pointer text-left flex items-center gap-1.5"
+                    >
+                      <User className="w-3.5 h-3.5 text-[#D4AF37]" />
+                      <span>Account Settings</span>
+                    </button>
+                  </li>
+                </>
+              ) : (
+                <>
+                  <li>
+                    <button
+                      onClick={onNavigateLogin}
+                      className="hover:text-[#F5D76E] transition-colors cursor-pointer text-left flex items-center gap-1.5 text-[#D4AF37] font-medium"
+                    >
+                      <User className="w-3.5 h-3.5" />
+                      <span>Customer Sign In</span>
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      onClick={onNavigateLogin}
+                      className="hover:text-[#F5D76E] transition-colors cursor-pointer text-left"
+                    >
+                      Create Account
+                    </button>
+                  </li>
+                </>
+              )}
               <li>
                 <a
                   href="mailto:concierge@novora.digital?subject=Catalog%20Inquiry"
-                  className="hover:text-[#F5D76E] transition-colors"
+                  className="hover:text-[#F5D76E] transition-colors block pt-1"
                 >
                   Support Desk
                 </a>
@@ -134,7 +174,7 @@ export const Footer: React.FC<FooterProps> = ({
 
         </div>
 
-        {/* Bottom Bar: Indian Payments & Copyright */}
+        {/* Bottom Bar: Indian Payments & Copyright & Admin Portal */}
         <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-light">
           
           <div className="flex items-center gap-2">
@@ -147,6 +187,16 @@ export const Footer: React.FC<FooterProps> = ({
             <span className="px-2 py-0.5 rounded bg-[#0A0A0A] border border-white/10">RuPay</span>
             <span className="px-2 py-0.5 rounded bg-[#0A0A0A] border border-white/10">NetBanking</span>
             <span className="px-2 py-0.5 rounded bg-[#0A0A0A] border border-white/10">Cards</span>
+          </div>
+
+          {/* Discrete Admin Portal Entry (Restricted) */}
+          <div>
+            <button
+              onClick={onNavigateAdmin}
+              className="text-[10px] font-mono text-[#555] hover:text-[#D4AF37] transition-colors cursor-pointer"
+            >
+              Admin Portal →
+            </button>
           </div>
 
         </div>

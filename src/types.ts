@@ -36,10 +36,38 @@ export interface CartItem {
 
 export type Currency = 'INR' | 'USD' | 'EUR' | 'GBP';
 
+export type CustomerAccountTab = 'overview' | 'library' | 'orders' | 'settings';
+
 export type CurrentView = 
   | { page: 'home' }
   | { page: 'all-products' }
   | { page: 'category'; category: PrimaryCategory }
   | { page: 'product'; productId: string }
-  | { page: 'admin' }
+  | { page: 'login'; redirectAfter?: string }
+  | { page: 'signup'; redirectAfter?: string }
+  | { page: 'account'; tab?: CustomerAccountTab }
+  | { page: 'admin'; section?: 'overview' | 'products' | 'orders' | 'customers' | 'coupons' | 'settings' }
   | { page: 'admin-login' };
+
+export interface PurchasedEbook {
+  productId: string;
+  productTitle: string;
+  price: number;
+  purchasedAt: string;
+  orderId?: string;
+  licenseKey?: string;
+  coverImage?: string;
+}
+
+export interface CustomerProfile {
+  id: string;
+  userId?: string;
+  email: string;
+  name: string;
+  phone?: string;
+  purchasedProducts: PurchasedEbook[];
+  totalSpent: number;
+  orderCount: number;
+  createdAt: string;
+  lastOrderDate?: string;
+}

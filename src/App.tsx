@@ -4,7 +4,8 @@ import {
   CartItem, 
   Currency, 
   PrimaryCategory, 
-  CurrentView 
+  CurrentView,
+  CustomerAccountTab 
 } from './types';
 import { 
   loadStoredProducts, 
@@ -21,8 +22,10 @@ import { FeaturedProducts } from './components/FeaturedProducts';
 import { CategoryPage } from './components/CategoryPage';
 import { ProductDetailPage } from './components/ProductDetailPage';
 import { AllProductsPage } from './components/AllProductsPage';
-import { AdminDashboard } from './components/AdminDashboard';
+import { AdminDashboard, AdminSection } from './components/AdminDashboard';
 import { AdminLogin } from './components/AdminLogin';
+import { CustomerAuth } from './components/CustomerAuth';
+import { CustomerDashboard } from './components/CustomerDashboard';
 import { BrandManifesto } from './components/BrandManifesto';
 import { FaqSection } from './components/FaqSection';
 import { Newsletter } from './components/Newsletter';
@@ -31,10 +34,10 @@ import { CartDrawer } from './components/CartDrawer';
 import { CheckoutModal } from './components/CheckoutModal';
 import { SearchModal } from './components/SearchModal';
 import { NovoraLogo } from './components/NovoraLogo';
-import { Check, ShieldAlert, ArrowLeft } from 'lucide-react';
+import { Check, ShieldAlert, ArrowLeft, ArrowRight, User as UserIcon } from 'lucide-react';
 
 function NovoraStoreApp() {
-  const { user, isAdmin, loading: authLoading, ownerEmail } = useAuth();
+  const { user, isAdmin, loading: authLoading, signOut, ownerEmail } = useAuth();
 
   // Products state (initial cache from localStorage, synced with Firestore)
   const [products, setProducts] = useState<Product[]>(() => loadStoredProducts());
@@ -84,11 +87,27 @@ function NovoraStoreApp() {
 
     if (!clean || clean === '') return { view: { page: 'home' } };
     if (clean === 'checkout') return { view: { page: 'home' }, openCheckout: true };
+
+    // Customer Authentication routes
+    if (clean === 'login' || clean === 'signin') return { view: { page: 'login' } };
+    if (clean === 'signup' || clean === 'register') return { view: { page: 'signup' } };
+
+    // Customer Account & Dashboard routes
+    if (clean === 'account' || clean === 'account/overview') return { view: { page: 'account', tab: 'overview' } };
+    if (clean === 'account/library' || clean === 'library') return { view: { page: 'account', tab: 'library' } };
+    if (clean === 'account/orders' || clean === 'orders') return { view: { page: 'account', tab: 'orders' } };
+    if (clean === 'account/settings' || clean === 'settings') return { view: { page: 'account', tab: 'settings' } };
+
+    // Admin routes
     if (clean === 'admin/login' || clean === 'admin-login') return { view: { page: 'admin-login' } };
     if (clean === 'admin') return { view: { page: 'admin' } };
-    if (clean === 'account') {
-      return { view: { page: 'admin' } };
-    }
+    if (clean === 'admin/products') return { view: { page: 'admin', section: 'products' } };
+    if (clean === 'admin/orders') return { view: { page: 'admin', section: 'orders' } };
+    if (clean === 'admin/customers') return { view: { page: 'admin', section: 'customers' } };
+    if (clean === 'admin/coupons') return { view: { page: 'admin', section: 'coupons' } };
+    if (clean === 'admin/settings') return { view: { page: 'admin', section: 'settings' } };
+
+    // Catalog & Products routes
     if (clean === 'products' || clean === 'all-products') return { view: { page: 'all-products' } };
     if (clean.startsWith('category/')) {
       const cat = clean.split('/')[1]?.replace(/\/+$/, '') as PrimaryCategory;
@@ -100,6 +119,7 @@ function NovoraStoreApp() {
       const pid = clean.split('/')[1]?.replace(/\/+$/, '');
       if (pid) return { view: { page: 'product', productId: pid } };
     }
+
     return { view: { page: 'home' } };
   };
 
@@ -139,8 +159,21 @@ function NovoraStoreApp() {
       targetPath = `/category/${view.category}`;
     } else if (view.page === 'product') {
       targetPath = `/product/${view.productId}`;
+    } else if (view.page === 'login') {
+      targetPath = '/login';
+    } else if (view.page === 'signup') {
+      targetPath = '/signup';
+    } else if (view.page === 'account') {
+      if (view.tab === 'library') targetPath = '/account/library';
+      else if (view.tab === 'orders') targetPath = '/account/orders';
+      else if (view.tab === 'settings') targetPath = '/account/settings';
+      else targetPath = '/account';
     } else if (view.page === 'admin') {
-      targetPath = '/admin';
+      if (view.section && view.section !== 'overview') {
+        targetPath = `/admin/${view.section}`;
+      } else {
+        targetPath = '/admin';
+      }
     } else if (view.page === 'admin-login') {
       targetPath = '/admin/login';
     }
@@ -181,13 +214,13 @@ function NovoraStoreApp() {
     setIsCheckoutOpen(true);
   };
 
-  const handleUpdateQuantity = (productId: string, quantity: number) => {
-    if (quantity <= 0) {
+  const handleUpdateQuantity = (productId: string, qty: number) => {
+    if (qty <= 0) {
       handleRemoveItem(productId);
       return;
     }
     setCartItems((prev) =>
-      prev.map((item) => (item.product.id === productId ? { ...item, quantity } : item))
+      prev.map((item) => (item.product.id === productId ? { ...item, quantity: qty } : item))
     );
   };
 
@@ -195,9 +228,12 @@ function NovoraStoreApp() {
     setCartItems((prev) => prev.filter((item) => item.product.id !== productId));
   };
 
+  const handleClearCart = () => {
+    setCartItems([]);
+  };
+
   const totalCartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
 
-  // Active category highlight in Navbar
   const getActiveCategoryForNav = (): PrimaryCategory | 'all' | null => {
     if (currentView.page === 'category') return currentView.category;
     if (currentView.page === 'all-products') return 'all';
@@ -205,17 +241,99 @@ function NovoraStoreApp() {
   };
 
   // -------------------------------------------------------------
-  // SECURE ADMIN ROUTING GATE
+  // CUSTOMER AUTHENTICATION VIEWS (/login, /signup)
+  // -------------------------------------------------------------
+  if (currentView.page === 'login' || currentView.page === 'signup') {
+    // If user is already authenticated:
+    // If admin, send to /admin; if customer, send to /account
+    if (user) {
+      if (isAdmin) {
+        navigateTo({ page: 'admin' });
+      } else {
+        navigateTo({ page: 'account', tab: 'overview' });
+      }
+      return null;
+    }
+
+    return (
+      <CustomerAuth
+        initialMode={currentView.page === 'signup' ? 'signup' : 'login'}
+        onSuccess={() => {
+          showToast('Welcome to your customer account.');
+          navigateTo({ page: 'account', tab: 'overview' });
+        }}
+        onBackToStore={() => navigateTo({ page: 'home' })}
+        onNavigateToAdminLogin={() => navigateTo({ page: 'admin-login' })}
+      />
+    );
+  }
+
+  // -------------------------------------------------------------
+  // CUSTOMER DASHBOARD VIEW (/account, /account/orders, /account/library)
+  // -------------------------------------------------------------
+  if (currentView.page === 'account') {
+    if (authLoading) {
+      return (
+        <div className="min-h-screen bg-[#040404] flex items-center justify-center text-white">
+          <div className="text-center space-y-4">
+            <NovoraLogo variant="vertical" size="sm" />
+            <div className="w-6 h-6 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin mx-auto mt-2" />
+            <div className="text-[11px] font-mono uppercase tracking-widest text-[#D4AF37]">
+              Loading Customer Library...
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // If not authenticated, redirect to /login
+    if (!user) {
+      return (
+        <CustomerAuth
+          initialMode="login"
+          onSuccess={() => {
+            showToast('Authenticated successfully.');
+            navigateTo({ page: 'account', tab: currentView.tab || 'library' });
+          }}
+          onBackToStore={() => navigateTo({ page: 'home' })}
+          onNavigateToAdminLogin={() => navigateTo({ page: 'admin-login' })}
+        />
+      );
+    }
+
+    return (
+      <CustomerDashboard
+        initialTab={currentView.tab || 'library'}
+        products={products}
+        currency={currency}
+        onNavigateHome={() => navigateTo({ page: 'home' })}
+        onNavigateAllProducts={() => navigateTo({ page: 'all-products' })}
+        onNavigateProduct={(pid) => navigateTo({ page: 'product', productId: pid })}
+        onSignOut={async () => {
+          await signOut();
+          showToast('Signed out of customer account.');
+          navigateTo({ page: 'home' });
+        }}
+      />
+    );
+  }
+
+  // -------------------------------------------------------------
+  // ADMIN AUTHENTICATION VIEW (/admin/login)
   // -------------------------------------------------------------
   if (currentView.page === 'admin-login') {
     return (
       <AdminLogin
         onLoginSuccess={() => navigateTo({ page: 'admin' })}
         onBackToStore={() => navigateTo({ page: 'home' })}
+        onNavigateToCustomerLogin={() => navigateTo({ page: 'login' })}
       />
     );
   }
 
+  // -------------------------------------------------------------
+  // ADMIN DASHBOARD GATE (/admin, /admin/products, /admin/orders, etc.)
+  // -------------------------------------------------------------
   if (currentView.page === 'admin') {
     // If auth state is still determining
     if (authLoading) {
@@ -238,45 +356,59 @@ function NovoraStoreApp() {
         <AdminLogin
           onLoginSuccess={() => navigateTo({ page: 'admin' })}
           onBackToStore={() => navigateTo({ page: 'home' })}
+          onNavigateToCustomerLogin={() => navigateTo({ page: 'login' })}
         />
       );
     }
 
-    // If user is authenticated, but not authorized as admin/owner
+    // STRICT RBAC: If user is authenticated as a customer but NOT authorized as admin
     if (!isAdmin) {
       return (
-        <div className="min-h-screen bg-[#030303] flex flex-col items-center justify-center p-6 text-center text-white">
-          <div className="max-w-md w-full p-8 rounded-2xl bg-[#080808] border border-red-500/30 shadow-[0_20px_50px_rgba(0,0,0,0.9)] space-y-5">
+        <div className="min-h-screen bg-[#030303] flex flex-col items-center justify-center p-6 text-center text-white selection:bg-[#D4AF37] selection:text-black">
+          <div className="max-w-md w-full p-8 rounded-2xl bg-[#080808] border border-red-500/40 shadow-[0_20px_50px_rgba(0,0,0,0.95)] space-y-5">
             <div className="flex justify-center mb-1">
               <NovoraLogo variant="vertical" size="sm" />
             </div>
-            <div className="w-12 h-12 rounded-full bg-red-950/60 border border-red-500/40 text-red-400 flex items-center justify-center mx-auto">
-              <ShieldAlert className="w-6 h-6" />
+            <div className="w-14 h-14 rounded-full bg-red-950/60 border border-red-500/50 text-red-400 flex items-center justify-center mx-auto shadow-[0_0_25px_rgba(239,68,68,0.2)]">
+              <ShieldAlert className="w-7 h-7" />
             </div>
             <div>
+              <span className="text-[10px] font-mono uppercase tracking-widest text-red-400 block mb-1">
+                Zero-Trust RBAC Violation
+              </span>
               <h2 className="font-serif text-2xl font-light text-white">
-                Access Denied: Unauthorized
+                Access Denied: Administrator Required
               </h2>
               <p className="text-xs text-[#888] mt-2 leading-relaxed">
-                You are authenticated as <span className="text-white font-mono">{user.email}</span>, but your account lacks administrative permissions for NOVORA.
+                You are currently signed in as customer <span className="text-white font-mono">{user.email}</span>. Administrative controls, catalog management, and store records are restricted to authorized store operators.
               </p>
             </div>
-            <div className="p-3 rounded bg-[#040404] border border-white/10 text-[11px] text-[#A8A8A8] text-left space-y-1">
-              <div>Store Owner: <span className="text-[#D4AF37] font-mono">{ownerEmail}</span></div>
-              <div className="text-[10px] text-[#666]">Firestore security rules enforce Zero-Trust RBAC.</div>
+            <div className="p-3.5 rounded-xl bg-[#040404] border border-white/10 text-[11px] text-[#A8A8A8] text-left space-y-1 font-mono">
+              <div>Account Role: <span className="text-emerald-400">Verified Customer</span></div>
+              <div>Required Role: <span className="text-red-400">Store Administrator</span></div>
+              <div>Owner Signature: <span className="text-[#D4AF37]">{ownerEmail}</span></div>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
+              <button
+                onClick={() => navigateTo({ page: 'account', tab: 'overview' })}
+                className="flex-1 py-2.5 rounded-lg bg-gradient-to-r from-[#D4AF37] to-[#C9A227] hover:brightness-110 text-xs font-semibold text-black transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <UserIcon className="w-3.5 h-3.5" />
+                <span>Go to My Account</span>
+              </button>
               <button
                 onClick={() => navigateTo({ page: 'admin-login' })}
-                className="flex-1 py-2.5 rounded bg-white/10 hover:bg-white/20 text-xs font-semibold text-white transition-colors cursor-pointer"
+                className="flex-1 py-2.5 rounded-lg bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-semibold text-white transition-colors cursor-pointer"
               >
                 Switch Account
               </button>
+            </div>
+            <div>
               <button
                 onClick={() => navigateTo({ page: 'home' })}
-                className="flex-1 py-2.5 rounded bg-[#D4AF37] hover:brightness-110 text-xs font-semibold text-black transition-all cursor-pointer"
+                className="text-xs text-[#777] hover:text-[#D4AF37] transition-colors"
               >
-                Return to Store
+                ← Return to Storefront
               </button>
             </div>
           </div>
@@ -287,6 +419,7 @@ function NovoraStoreApp() {
     // Authenticated and Authorized Admin -> Render Full Admin Dashboard
     return (
       <AdminDashboard
+        initialSection={currentView.section as AdminSection}
         onBackToStore={() => navigateTo({ page: 'home' })}
         onNavigateToCategory={(cat) => navigateTo({ page: 'category', category: cat })}
         initialEditProduct={editingProductInAdmin}
@@ -305,7 +438,7 @@ function NovoraStoreApp() {
   }
 
   // -------------------------------------------------------------
-  // PUBLIC STOREFRONT (UNCHANGED AESTHETIC & ARCHITECTURE)
+  // PUBLIC STOREFRONT (CUSTOMER STOREFRONT BY DEFAULT)
   // -------------------------------------------------------------
   return (
     <div className="min-h-screen bg-[#050505] text-[#F5F5F5] selection:bg-[#D4AF37] selection:text-black">
@@ -330,14 +463,19 @@ function NovoraStoreApp() {
         onNavigateHome={() => navigateTo({ page: 'home' })}
         onNavigateCategory={(cat) => navigateTo({ page: 'category', category: cat })}
         onNavigateAllProducts={() => navigateTo({ page: 'all-products' })}
+        onNavigateLogin={() => navigateTo({ page: 'login' })}
+        onNavigateAccount={(tab: CustomerAccountTab = 'overview') => navigateTo({ page: 'account', tab })}
         onNavigateAdmin={() => {
           setEditingProductInAdmin(null);
-          // If logged in as admin, go straight to /admin; otherwise go to /admin/login
           if (user && isAdmin) {
             navigateTo({ page: 'admin' });
           } else {
             navigateTo({ page: 'admin-login' });
           }
+        }}
+        onSignOut={async () => {
+          await signOut();
+          showToast('Signed out successfully.');
         }}
         activeCategory={getActiveCategoryForNav()}
       />
@@ -390,7 +528,7 @@ function NovoraStoreApp() {
           />
         )}
 
-        {/* VIEW 3: ALL PRODUCTS PAGE */}
+        {/* VIEW 3: ALL PRODUCTS PAGE (/products) */}
         {currentView.page === 'all-products' && (
           <AllProductsPage
             products={products}
@@ -401,7 +539,7 @@ function NovoraStoreApp() {
           />
         )}
 
-        {/* VIEW 4: DEDICATED PRODUCT DETAIL PAGE */}
+        {/* VIEW 4: DEDICATED PRODUCT DETAIL PAGE (/product/:id) */}
         {currentView.page === 'product' && (() => {
           const currentProd = products.find((p) => p.id === currentView.productId) || products[0];
           return (
@@ -431,6 +569,8 @@ function NovoraStoreApp() {
       <Footer
         onNavigateCategory={(cat) => navigateTo({ page: 'category', category: cat })}
         onNavigateAllProducts={() => navigateTo({ page: 'all-products' })}
+        onNavigateLogin={() => navigateTo({ page: 'login' })}
+        onNavigateAccount={(tab: CustomerAccountTab = 'overview') => navigateTo({ page: 'account', tab })}
         onNavigateAdmin={() => {
           setEditingProductInAdmin(null);
           if (user && isAdmin) {
@@ -464,12 +604,11 @@ function NovoraStoreApp() {
         cartItems={cartItems}
         currency={currency}
         appliedDiscount={appliedDiscount}
-        onCompleteOrder={() => {
-          // Re-fetch products and orders if needed
-        }}
+        onCompleteOrder={handleClearCart}
+        onNavigateToLibrary={() => navigateTo({ page: 'account', tab: 'library' })}
       />
 
-      {/* Search Modal */}
+      {/* Search Catalog Modal */}
       <SearchModal
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
@@ -477,6 +616,7 @@ function NovoraStoreApp() {
         currency={currency}
         onSelectProduct={(p) => {
           navigateTo({ page: 'product', productId: p.id });
+          setIsSearchOpen(false);
         }}
         onAddToCart={handleAddToCart}
       />

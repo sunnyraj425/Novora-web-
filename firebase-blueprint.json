@@ -134,9 +134,28 @@
         "createdAt": { "type": "string" }
       },
       "required": ["id", "email", "role"]
+    },
+    "User": {
+      "title": "User",
+      "description": "Authenticated customer user profile.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 200 },
+        "name": { "type": "string", "maxLength": 200 },
+        "phone": { "type": "string", "maxLength": 50 },
+        "role": { "type": "string", "enum": ["customer", "admin"] },
+        "createdAt": { "type": "string" },
+        "lastLoginAt": { "type": "string" }
+      },
+      "required": ["id", "email"]
     }
   },
   "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Customer accounts and profile settings."
+    },
     "/products/{productId}": {
       "schema": "Product",
       "description": "Product collection for public catalog and store management."
