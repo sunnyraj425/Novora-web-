@@ -1,0 +1,173 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "A digital product available in the NOVORA store across AI, Finance, and Communication categories.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "category": { "type": "string", "enum": ["ai", "finance", "communication"] },
+        "shortDescription": { "type": "string", "maxLength": 500 },
+        "fullDescription": { "type": "string", "maxLength": 5000 },
+        "price": { "type": "number" },
+        "originalPrice": { "type": "number" },
+        "discount": { "type": "number" },
+        "coverImage": { "type": "string", "maxLength": 2000 },
+        "productFormat": { "type": "string", "maxLength": 200 },
+        "whatsIncluded": { "type": "array" },
+        "whatYoullLearn": { "type": "array" },
+        "whoItsFor": { "type": "array" },
+        "chapters": { "type": "array" },
+        "features": { "type": "array" },
+        "isBundle": { "type": "boolean" },
+        "isFeatured": { "type": "boolean" },
+        "isPublished": { "type": "boolean" },
+        "digitalFile": { "type": "string", "maxLength": 500 },
+        "badge": { "type": "string", "maxLength": 100 },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "title", "category", "shortDescription", "fullDescription", "price"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "A customer purchase order for digital products.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "customerEmail": { "type": "string", "maxLength": 200 },
+        "customerName": { "type": "string", "maxLength": 200 },
+        "customerPhone": { "type": "string", "maxLength": 50 },
+        "productIds": { "type": "array" },
+        "productTitles": { "type": "array" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 10 },
+        "paymentStatus": { "type": "string", "enum": ["completed", "pending", "failed"] },
+        "paymentMethod": { "type": "string", "maxLength": 50 },
+        "licenseKey": { "type": "string", "maxLength": 100 },
+        "orderDate": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "customerEmail", "customerName", "amount", "paymentStatus"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "A customer profile tracking purchased digital items.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 200 },
+        "name": { "type": "string", "maxLength": 200 },
+        "purchasedProducts": { "type": "array" },
+        "totalSpent": { "type": "number" },
+        "orderCount": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "lastOrderDate": { "type": "string" }
+      },
+      "required": ["id", "email", "name"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Primary catalog category settings (AI, Finance, Communication).",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "enum": ["ai", "finance", "communication"] },
+        "name": { "type": "string", "maxLength": 100 },
+        "tagline": { "type": "string", "maxLength": 200 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "accent": { "type": "string", "maxLength": 50 },
+        "productCount": { "type": "number" }
+      },
+      "required": ["id", "name", "tagline"]
+    },
+    "Coupon": {
+      "title": "Coupon",
+      "description": "Discount coupon code for purchases.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "code": { "type": "string", "maxLength": 50 },
+        "discountPercent": { "type": "number" },
+        "isActive": { "type": "boolean" },
+        "expiryDate": { "type": "string" },
+        "usageCount": { "type": "number" }
+      },
+      "required": ["id", "code", "discountPercent", "isActive"]
+    },
+    "Testimonial": {
+      "title": "Testimonial",
+      "description": "Admin-verified customer or editorial testimonial.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "authorName": { "type": "string", "maxLength": 200 },
+        "authorTitle": { "type": "string", "maxLength": 200 },
+        "quote": { "type": "string", "maxLength": 1000 },
+        "discipline": { "type": "string", "enum": ["ai", "finance", "communication", "general"] },
+        "isApproved": { "type": "boolean" },
+        "rating": { "type": "number" }
+      },
+      "required": ["id", "authorName", "quote", "isApproved"]
+    },
+    "HomepageConfig": {
+      "title": "HomepageConfig",
+      "description": "Admin-customizable homepage display settings.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "headline": { "type": "string", "maxLength": 300 },
+        "tagline": { "type": "string", "maxLength": 300 },
+        "featuredProductIds": { "type": "array" },
+        "announcement": { "type": "string", "maxLength": 500 },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id"]
+    },
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Authorized NOVORA store administrator.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 200 },
+        "role": { "type": "string", "enum": ["owner", "admin"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "email", "role"]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Product collection for public catalog and store management."
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Customer purchase orders recorded during checkout."
+    },
+    "/customers/{customerId}": {
+      "schema": "Customer",
+      "description": "Registered or guest customer records with purchased products."
+    },
+    "/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "The 3 primary disciplines: AI, Finance, Communication."
+    },
+    "/coupons/{couponId}": {
+      "schema": "Coupon",
+      "description": "Store discount and privilege codes."
+    },
+    "/testimonials/{testimonialId}": {
+      "schema": "Testimonial",
+      "description": "Admin curated and approved testimonials."
+    },
+    "/homepage_config/{configId}": {
+      "schema": "HomepageConfig",
+      "description": "Customizable homepage copy and featured product IDs."
+    },
+    "/admins/{adminId}": {
+      "schema": "AdminUser",
+      "description": "Registry of authorized store administrators."
+    }
+  }
+}

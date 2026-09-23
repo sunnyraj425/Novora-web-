@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwnerEmail() {
+      return isSignedIn() && (
+        request.auth.token.email == 'worldsunnyday88@gmail.com' ||
+        (request.auth.token.email != null && request.auth.token.email.lower() == 'worldsunnyday88@gmail.com')
+      );
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        isOwnerEmail() ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (request.auth.token.email != null && exists(/databases/$(database)/documents/admins/$(request.auth.token.email))) ||
+        (request.auth.token.email != null && exists(/databases/$(database)/documents/admins/$(request.auth.token.email.lower())))
+      );
+    }
+
+    // Products: Public catalog reading; Admins have full access
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Orders: Checkout creates order, Admin reads all, customer reads own
+    match /orders/{orderId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.customerEmail == request.auth.token.email);
+      allow create: if request.resource.data.amount is number && request.resource.data.customerEmail is string;
+      allow update, delete: if isAdmin();
+    }
+
+    // Customers: Admin manages customer list, customer reads own record
+    match /customers/{customerId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.email == request.auth.token.email);
+      allow write: if isAdmin() || (isSignedIn() && request.resource.data.email == request.auth.token.email);
+    }
+
+    // Categories: Public reads categories, Admin updates
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Coupons: Public can check active coupon, Admin manages
+    match /coupons/{couponId} {
+      allow read: if resource.data.isActive == true || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Testimonials: Public reads approved testimonials, Admin manages
+    match /testimonials/{testimonialId} {
+      allow read: if resource.data.isApproved == true || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Homepage Configuration: Public reads, Admin manages
+    match /homepage_config/{configId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Admin Registry: Signed in users can read to verify status; Owner or existing admin can write
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isOwnerEmail() || isAdmin();
+    }
+  }
+}

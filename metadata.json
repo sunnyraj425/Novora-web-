@@ -1,0 +1,6 @@
+{
+  "name": "NOVORA",
+  "description": "Premium digital products, AI ebooks, courses, and productivity resources. Become Better Than Yesterday.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
