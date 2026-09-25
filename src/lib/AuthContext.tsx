@@ -38,6 +38,8 @@ export function formatAuthError(err: any, email?: string): string {
       return 'An account with this email already exists. If you previously registered using Google, please use "Continue with Google" or click "Forgot Password?" on the Sign In tab to set a password.';
     case 'auth/weak-password':
       return 'Password is too weak. Please use at least 6 characters.';
+    case 'auth/operation-not-allowed':
+      return 'Email & Password authentication is currently not enabled in this Firebase project. Please sign in with "Continue with Google" or enable the Email/Password provider in the Firebase Console (Authentication → Sign-in method).';
     case 'auth/popup-closed-by-user':
       return 'Google sign-in popup was closed before completing authentication.';
     case 'auth/popup-blocked':
@@ -210,7 +212,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     } catch (err: any) {
       let msg = 'Unable to send password reset email. Please try again later.';
-      if (err.code === 'auth/invalid-email') {
+      if (err.code === 'auth/operation-not-allowed') {
+        msg = 'Email/Password sign-in is not enabled in the Firebase Console. Please sign in using Google or enable Email/Password under Authentication → Sign-in method.';
+      } else if (err.code === 'auth/invalid-email') {
         msg = 'Please enter a valid email address.';
       } else if (err.code === 'auth/user-not-found') {
         msg = 'No customer account found with this email address.';
@@ -239,7 +243,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       return { success: true };
     } catch (err: any) {
-      const msg = 'Admin credentials verification failed. Check email and password.';
+      const msg = err.code === 'auth/operation-not-allowed'
+        ? 'Email/Password authentication is disabled in Firebase Console. Use Google Admin sign-in or enable Email/Password.'
+        : 'Admin credentials verification failed. Check email and password.';
       setAuthError(msg);
       return { success: false, error: msg };
     }

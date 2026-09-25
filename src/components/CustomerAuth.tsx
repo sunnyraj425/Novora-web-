@@ -315,7 +315,7 @@ export const CustomerAuth: React.FC<CustomerAuthProps> = ({
               </div>
 
               {/* Helpful quick-action if the error suggests a Google account or invalid credentials */}
-              {mode === 'login' && !showForgotPassword && (
+              {mode === 'login' && !showForgotPassword && (formError || authError)?.includes('Invalid credentials') && (
                 <div className="pt-2 border-t border-red-500/20 flex flex-wrap items-center gap-2 text-[11px]">
                   <span className="text-[#A8A8A8]">Need a password for email login?</span>
                   <button
@@ -324,6 +324,20 @@ export const CustomerAuth: React.FC<CustomerAuthProps> = ({
                     className="text-[#D4AF37] hover:underline font-medium cursor-pointer"
                   >
                     Send Password Setup Link →
+                  </button>
+                </div>
+              )}
+
+              {/* Instant fallback to Google Sign-In if Email/Password provider is disabled in Firebase */}
+              {((formError || authError)?.includes('Firebase Console') || (formError || authError)?.includes('not enabled')) && !showForgotPassword && (
+                <div className="pt-2 border-t border-red-500/20 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                  <span className="text-[#A8A8A8]">Fast alternative:</span>
+                  <button
+                    type="button"
+                    onClick={handleGoogleSignIn}
+                    className="text-[#D4AF37] hover:underline font-medium cursor-pointer flex items-center gap-1"
+                  >
+                    <span>Instant Sign In with Google →</span>
                   </button>
                 </div>
               )}
